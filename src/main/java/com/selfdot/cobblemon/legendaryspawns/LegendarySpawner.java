@@ -21,12 +21,10 @@ import java.util.Optional;
 public class LegendarySpawner {
   private static final int SPAWN_INTERVAL_SECONDS = 60 * 60;
   public static final int SPAWN_INTERVAL_TICKS = 40 * SPAWN_INTERVAL_SECONDS;
-
-  private static final int MAXIMUM_SPAWN_ATTEMPTS = 5;
-  private static final int MINIMUM_REQUIRED_PLAYERS = 1;
-
   private static final int MINIMUM_SPAWN_DISTANCE = 32;
   private static final int MAXIMUM_SPAWN_DISTANCE = 128;
+  private static final int MAXIMUM_SPAWN_ATTEMPTS = 5;
+  private static final int MINIMUM_REQUIRED_PLAYERS = 1;
 
   private static final int SHINY_ODDS = 4096;
 
@@ -34,6 +32,7 @@ public class LegendarySpawner {
 
   private final MinecraftServer server;
   private final List<LegendarySpawn> legendarySpawnList;
+  private final LightingStriker lightingStriker = new LightingStriker();
 
   public LegendarySpawner(MinecraftServer server, List<LegendarySpawn> legendarySpawnList) {
     this.server = server;
@@ -46,6 +45,7 @@ public class LegendarySpawner {
       spawnLegendary();
       spawnCountdown = SPAWN_INTERVAL_TICKS;
     }
+    lightingStriker.tick();
   }
 
   private void spawnLegendary() {
@@ -97,6 +97,8 @@ public class LegendarySpawner {
     pokemonEntity.setDespawner(LegendaryDespawner.getInstance());
     pokemonEntity.setPos(spawnPos);
     spawnLevel.addFreshEntity(pokemonEntity);
+
+    lightingStriker.setTracked(pokemonEntity);
 
     server.getPlayerList().broadcastSystemMessage(
         Component.literal("A Legendary ")
