@@ -7,9 +7,13 @@ import net.minecraft.world.phys.Vec3;
 
 public class LightingStriker {
 
-  private static final int LIGHTNING_STRIKES_PER_SPAWN = 6;
+  private final int strikeInterval;
   private int strikeCountdown = 0;
   private Entity tracked = null;
+
+  public LightingStriker(int strikeInterval) {
+    this.strikeInterval = strikeInterval;
+  }
 
   public void setTracked(Entity tracked) {
     this.tracked = tracked;
@@ -22,7 +26,7 @@ public class LightingStriker {
       Vec3 strikePos = tracked.position().add(0, 5, 0);
       lightningEntity.setPos(strikePos);
       tracked.level.addFreshEntity(lightningEntity);
-      strikeCountdown = LegendarySpawner.SPAWN_INTERVAL_TICKS / LIGHTNING_STRIKES_PER_SPAWN;
+      strikeCountdown = strikeInterval;
     }
   }
 

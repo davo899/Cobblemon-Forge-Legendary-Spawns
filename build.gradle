@@ -134,6 +134,7 @@ dependencies {
     implementation(":architectury-6.5.69-forge")
     implementation(":kotlinforforge-3.11.0-all")
     implementation(":Cobblemon-forge-1.3.2+1.19.2")
+    implementation("com.google.code.gson:gson-parent:2.10.1")
 
     // Real mod deobf dependency examples - these get remapped to your current mappings
     // compileOnly fg.deobf("mezz.jei:jei-${mc_version}:${jei_version}:api") // Adds JEI API as a compile dependency

@@ -19,38 +19,57 @@ import java.util.List;
 import java.util.Optional;
 
 public class LegendarySpawner {
-  private static final int SPAWN_INTERVAL_SECONDS = 60 * 60;
-  public static final int SPAWN_INTERVAL_TICKS = 40 * SPAWN_INTERVAL_SECONDS;
-  private static final int MINIMUM_SPAWN_DISTANCE = 32;
-  private static final int MAXIMUM_SPAWN_DISTANCE = 128;
-  private static final int MAXIMUM_SPAWN_ATTEMPTS = 5;
-  private static final int MINIMUM_REQUIRED_PLAYERS = 1;
 
-  private static final int SHINY_ODDS = 4096;
-
-  private int spawnCountdown = SPAWN_INTERVAL_TICKS;
+  private static final int TICKS_PER_SECOND = 40;
 
   private final MinecraftServer server;
   private final List<LegendarySpawn> legendarySpawnList;
-  private final LightingStriker lightingStriker = new LightingStriker();
+  private final int spawnIntervalTicks;
+  private final int minimumSpawnDistance;
+  private final int maximumSpawnDistance;
+  private final int maximumSpawnAttempts;
+  private final int minimumRequiredPlayers;
+  private final int shinyOdds;
 
-  public LegendarySpawner(MinecraftServer server, List<LegendarySpawn> legendarySpawnList) {
+  private int spawnCountdown;
+  private final LightingStriker lightingStriker;
+
+  public LegendarySpawner(
+      MinecraftServer server,
+      List<LegendarySpawn> legendarySpawnList,
+      int spawnIntervalSeconds,
+      int minimumSpawnDistance,
+      int maximumSpawnDistance,
+      int maximumSpawnAttempts,
+      int minimumRequiredPlayers,
+      int shinyOdds,
+      int lightningStrikesPerSpawn
+  ) {
     this.server = server;
     this.legendarySpawnList = legendarySpawnList;
+    this.spawnIntervalTicks = spawnIntervalSeconds * TICKS_PER_SECOND;
+    this.minimumSpawnDistance = minimumSpawnDistance;
+    this.maximumSpawnDistance = maximumSpawnDistance;
+    this.maximumSpawnAttempts = maximumSpawnAttempts;
+    this.minimumRequiredPlayers = minimumRequiredPlayers;
+    this.shinyOdds = shinyOdds;
+    this.lightingStriker = new LightingStriker(spawnIntervalTicks / lightningStrikesPerSpawn);
+
+    spawnCountdown = spawnIntervalTicks;
   }
 
   public void tick() {
     if (spawnCountdown > 0) spawnCountdown--;
     else {
       spawnLegendary();
-      spawnCountdown = SPAWN_INTERVAL_TICKS;
+      spawnCountdown = spawnIntervalTicks;
     }
     lightingStriker.tick();
   }
 
   private void spawnLegendary() {
     List<ServerPlayer> players = server.getPlayerList().getPlayers();
-    if (players.size() < MINIMUM_REQUIRED_PLAYERS) return;
+    if (players.size() < minimumRequiredPlayers) return;
 
     Optional<LegendarySpawn> chosenLegendaryOpt = legendarySpawnList.stream()
         .skip((int) (legendarySpawnList.size() * Math.random()))
@@ -66,9 +85,9 @@ public class LegendarySpawner {
     Vec3 spawnPos = null;
 
     while (spawnPos == null) {
-      if (++attemptedSpawns > MAXIMUM_SPAWN_ATTEMPTS) {
+      if (++attemptedSpawns > maximumSpawnAttempts) {
         LogUtils.getLogger().info("Skipping Legendary spawn: Could not find safe spawn location after " +
-            MAXIMUM_SPAWN_ATTEMPTS + " attempts");
+            maximumSpawnAttempts + " attempts");
         return;
       }
       // Choose random player
@@ -87,14 +106,14 @@ public class LegendarySpawner {
     Pokemon legendary = new Pokemon();
     legendary.setSpecies(chosenLegendary.species);
     legendary.setLevel(chosenLegendary.level);
-    if (Math.random() < (1d / SHINY_ODDS)) legendary.setShiny(true);
+    if (Math.random() < (1d / shinyOdds)) legendary.setShiny(true);
 
     PokemonEntity pokemonEntity = new PokemonEntity(
         spawnLevel,
         legendary,
         CobblemonEntities.POKEMON.get()
     );
-    pokemonEntity.setDespawner(LegendaryDespawner.getInstance());
+    pokemonEntity.setDespawner(new LegendaryDespawner(minimumSpawnDistance, spawnIntervalTicks));
     pokemonEntity.setPos(spawnPos);
     spawnLevel.addFreshEntity(pokemonEntity);
 
@@ -110,7 +129,7 @@ public class LegendarySpawner {
 
   @Nullable
   private Vec3 randomNearbySurfacePoint(Level level, Vec3 centre) {
-    double dist = MINIMUM_SPAWN_DISTANCE + ((MAXIMUM_SPAWN_DISTANCE - MINIMUM_SPAWN_DISTANCE) * Math.random());
+    double dist = minimumSpawnDistance + ((maximumSpawnDistance - minimumSpawnDistance) * Math.random());
     double theta = 2 * Math.PI * Math.random();
     double x = centre.x + (dist * Math.cos(theta));
     double z = centre.z + (dist * Math.sin(theta));
