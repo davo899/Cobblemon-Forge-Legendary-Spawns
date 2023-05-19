@@ -1,8 +1,13 @@
 package com.selfdot.cobblemon.legendaryspawns;
 
 import com.cobblemon.mod.common.CobblemonEntities;
+import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import com.cobblemon.mod.common.pokemon.Species;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.RandomNearbyPoint;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnLocationSelector;
@@ -13,55 +18,115 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.BiomeTags;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Material;
 import net.minecraft.world.phys.Vec3;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Scanner;
 
 public class LegendarySpawner {
 
+  private static final LegendarySpawner instance = new LegendarySpawner();
+  private LegendarySpawner() { }
+  public static LegendarySpawner getInstance() { return instance; }
+
   private static final int TICKS_PER_SECOND = 40;
 
-  private final MinecraftServer server;
-  private final List<LegendarySpawn> legendarySpawnList;
-  private final int spawnIntervalTicks;
-  private final int maximumSpawnAttempts;
-  private final int minimumRequiredPlayers;
-  private final int shinyOdds;
-
   private int spawnCountdown;
-  private final LightingStriker lightingStriker;
-  private final SpawnLocationSelector spawnLocationSelector;
-  private final List<SpawnSafetyCondition> spawnSafetyConditions;
-  private final LegendaryDespawner legendaryDespawner;
+  private SpawnLocationSelector spawnLocationSelector;
+  private List<SpawnSafetyCondition> spawnSafetyConditions;
 
-  public LegendarySpawner(
-      MinecraftServer server,
-      List<LegendarySpawn> legendarySpawnList,
-      int spawnIntervalSeconds,
-      int minimumSpawnDistance,
-      int maximumSpawnDistance,
-      int maximumSpawnAttempts,
-      int minimumRequiredPlayers,
-      int shinyOdds,
-      int lightningStrikesPerSpawn
-  ) {
-    this.server = server;
-    this.legendarySpawnList = legendarySpawnList;
-    this.spawnIntervalTicks = spawnIntervalSeconds * TICKS_PER_SECOND;
-    this.maximumSpawnAttempts = maximumSpawnAttempts;
-    this.minimumRequiredPlayers = minimumRequiredPlayers;
-    this.shinyOdds = shinyOdds;
+  private MinecraftServer server;
+  private List<LegendarySpawn> legendarySpawnList;
+  private int spawnIntervalTicks;
+  private int maximumSpawnAttempts;
+  private int minimumRequiredPlayers;
+  private int shinyOdds;
+
+  public boolean loadConfig() {
+    legendarySpawnList = new ArrayList<>();
+    try {
+      File legendarySpawnListFile = new File("config/legendaryspawns.txt");
+      Scanner configReader = new Scanner(legendarySpawnListFile);
+      while (configReader.hasNextLine()) {
+        String line = configReader.nextLine();
+        String[] parts = line.split(",");
+        if (parts.length != 2) continue;
+
+        Species species = PokemonSpecies.INSTANCE.getByName(parts[0]);
+        if (species == null) continue;
+
+        int level;
+        try {
+          level = Integer.parseInt(parts[1]);
+        } catch (NumberFormatException e) {
+          continue;
+        }
+
+        legendarySpawnList.add(new LegendarySpawn(species, level));
+      }
+      configReader.close();
+    } catch (FileNotFoundException e) {
+      return false;
+    }
+
+    final JsonObject defaultConfiguration = new JsonObject();
+    defaultConfiguration.addProperty(ConfigKey.SPAWN_INTERVAL_SECONDS, 3600);
+    defaultConfiguration.addProperty(ConfigKey.MINIMUM_SPAWN_DISTANCE, 32);
+    defaultConfiguration.addProperty(ConfigKey.MAXIMUM_SPAWN_DISTANCE, 128);
+    defaultConfiguration.addProperty(ConfigKey.MINIMUM_REQUIRED_PLAYERS, 1);
+    defaultConfiguration.addProperty(ConfigKey.MAXIMUM_SPAWN_ATTEMPTS, 5);
+    defaultConfiguration.addProperty(ConfigKey.SHINY_ODDS, 4096);
+    defaultConfiguration.addProperty(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN, 6);
+
+    Gson gson = new Gson();
+    JsonObject configuration;
+    try {
+      configuration = JsonParser.parseReader(new FileReader("config/legendaryspawnsConfig.json"))
+          .getAsJsonObject();
+    } catch (FileNotFoundException e) {
+      configuration = new JsonObject();
+    }
+    final JsonObject finalConfiguration = configuration;
+
+    boolean rewriteConfigFile = defaultConfiguration.keySet().stream().anyMatch(k -> !finalConfiguration.has(k));
+    defaultConfiguration.keySet().stream()
+        .filter(k -> !finalConfiguration.has(k))
+        .forEach(k -> finalConfiguration.add(k, defaultConfiguration.get(k)));
+
+    if (rewriteConfigFile) {
+      try {
+        FileWriter writer = new FileWriter("config/legendaryspawnsConfig.json");
+        gson.toJson(finalConfiguration, writer);
+        writer.close();
+      } catch (IOException e2) {
+        return false;
+      }
+    }
+    final int minimumSpawnDistance = finalConfiguration.get(ConfigKey.MINIMUM_SPAWN_DISTANCE).getAsInt();
+    this.spawnIntervalTicks = finalConfiguration.get(ConfigKey.SPAWN_INTERVAL_SECONDS).getAsInt() * TICKS_PER_SECOND;
+    this.maximumSpawnAttempts = finalConfiguration.get(ConfigKey.MAXIMUM_SPAWN_ATTEMPTS).getAsInt();
+    this.minimumRequiredPlayers = finalConfiguration.get(ConfigKey.MINIMUM_REQUIRED_PLAYERS).getAsInt();
+    this.shinyOdds = finalConfiguration.get(ConfigKey.SHINY_ODDS).getAsInt();
     this.spawnCountdown = spawnIntervalTicks;
-    this.lightingStriker = new LightingStriker(spawnIntervalTicks / lightningStrikesPerSpawn);
-    this.spawnLocationSelector = new RandomNearbyPoint(minimumSpawnDistance, maximumSpawnDistance);
+    LightingStriker.getInstance().setStrikeInterval(
+        spawnIntervalTicks / finalConfiguration.get(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN).getAsInt()
+    );
+    this.spawnLocationSelector = new RandomNearbyPoint(
+        minimumSpawnDistance, finalConfiguration.get(ConfigKey.MAXIMUM_SPAWN_DISTANCE).getAsInt()
+    );
     this.spawnSafetyConditions = List.of(new UnsafeFloorBlocks(List.of(Material.FIRE, Material.LAVA, Material.CACTUS)));
-    this.legendaryDespawner = new LegendaryDespawner(minimumSpawnDistance, spawnIntervalTicks);
+    LegendaryDespawner.getInstance().setMinimumDespawnDistance(minimumSpawnDistance);
+    LegendaryDespawner.getInstance().setSpawnIntervalTicks(spawnIntervalTicks);
+    return true;
+  }
+
+  public void setServer(MinecraftServer server) {
+    this.server = server;
   }
 
   public void tick() {
@@ -70,7 +135,7 @@ public class LegendarySpawner {
       spawnLegendary();
       spawnCountdown = spawnIntervalTicks;
     }
-    lightingStriker.tick();
+    LightingStriker.getInstance().tick();
   }
 
   private void spawnLegendary() {
@@ -127,11 +192,11 @@ public class LegendarySpawner {
         legendary,
         CobblemonEntities.POKEMON.get()
     );
-    pokemonEntity.setDespawner(legendaryDespawner);
+    pokemonEntity.setDespawner(LegendaryDespawner.getInstance());
     pokemonEntity.setPos(spawnPos);
     spawnLevel.addFreshEntity(pokemonEntity);
 
-    lightingStriker.setTracked(pokemonEntity);
+    LightingStriker.getInstance().setTracked(pokemonEntity);
 
     server.getPlayerList().broadcastSystemMessage(
         Component.literal("A Legendary ")

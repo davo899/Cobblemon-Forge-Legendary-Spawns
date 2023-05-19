@@ -6,12 +6,19 @@ import org.jetbrains.annotations.NotNull;
 
 public class LegendaryDespawner implements Despawner<PokemonEntity> {
 
-  private final int minimumDespawnDistance;
-  private final int spawnIntervalDistance;
+  private static final LegendaryDespawner instance = new LegendaryDespawner();
+  public static LegendaryDespawner getInstance() { return instance; }
+  private LegendaryDespawner() { }
 
-  public LegendaryDespawner(int minimumDespawnDistance, int spawnIntervalDistance) {
+  private int minimumDespawnDistance;
+  private int spawnIntervalTicks;
+
+  public void setMinimumDespawnDistance(int minimumDespawnDistance) {
     this.minimumDespawnDistance = minimumDespawnDistance;
-    this.spawnIntervalDistance = spawnIntervalDistance;
+  }
+
+  public void setSpawnIntervalTicks(int spawnIntervalTicks) {
+    this.spawnIntervalTicks = spawnIntervalTicks;
   }
 
   @Override
@@ -19,7 +26,7 @@ public class LegendaryDespawner implements Despawner<PokemonEntity> {
 
   @Override
   public boolean shouldDespawn(@NotNull PokemonEntity pokemonEntity) {
-    if (pokemonEntity.getTicksLived() < spawnIntervalDistance) return false;
+    if (pokemonEntity.getTicksLived() < spawnIntervalTicks) return false;
 
     return !pokemonEntity.level.hasNearbyAlivePlayer(
         pokemonEntity.getX(),

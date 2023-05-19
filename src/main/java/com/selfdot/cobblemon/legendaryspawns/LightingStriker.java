@@ -7,11 +7,16 @@ import net.minecraft.world.phys.Vec3;
 
 public class LightingStriker {
 
-  private final int strikeInterval;
+  private static final LightingStriker instance = new LightingStriker();
+  public static LightingStriker getInstance() { return instance; }
+  private LightingStriker() { }
+
+  private int strikeInterval;
   private int strikeCountdown = 0;
   private Entity tracked = null;
 
-  public LightingStriker(int strikeInterval) {
+  public void setStrikeInterval(int strikeInterval) {
+    this.strikeCountdown = Math.min(strikeInterval, strikeCountdown);
     this.strikeInterval = strikeInterval;
   }
 
@@ -21,7 +26,7 @@ public class LightingStriker {
 
   public void tick() {
     if (strikeCountdown > 0) strikeCountdown--;
-    else if (tracked != null) {
+    else if (!(tracked == null || tracked.isRemoved())) {
       LightningBolt lightningEntity = new LightningBolt(EntityType.LIGHTNING_BOLT, tracked.level);
       Vec3 strikePos = tracked.position().add(0, 5, 0);
       lightningEntity.setPos(strikePos);
