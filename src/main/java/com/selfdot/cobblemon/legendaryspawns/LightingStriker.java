@@ -25,6 +25,7 @@ public class LightingStriker {
   }
 
   public void addTracked(Entity entity) {
+    strikeCountdown = 0;
     tracked.add(entity);
   }
 

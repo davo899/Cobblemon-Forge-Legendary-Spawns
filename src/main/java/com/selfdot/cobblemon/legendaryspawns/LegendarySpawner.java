@@ -1,7 +1,11 @@
 package com.selfdot.cobblemon.legendaryspawns;
 
 import com.cobblemon.mod.common.CobblemonEntities;
+import com.cobblemon.mod.common.api.Priority;
+import com.cobblemon.mod.common.api.events.CobblemonEvents;
+import com.cobblemon.mod.common.api.events.pokemon.PokemonCapturedEvent;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
+import com.cobblemon.mod.common.api.reactive.ObservableSubscription;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.Species;
@@ -14,6 +18,7 @@ import com.selfdot.cobblemon.legendaryspawns.spawnlocation.RandomNearbyPoint;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnLocationSelector;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnSafetyCondition;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.UnsafeFloorBlocks;
+import kotlin.Unit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -52,6 +57,8 @@ public class LegendarySpawner {
   private String ultraBeastSpawnAnnouncement;
   private String legendaryCaptureAnnouncement;
   private String ultraBeastCaptureAnnouncement;
+  private float legendarySpawnChance;
+  private float ultraBeastSpawnChance;
 
   public boolean loadConfig() {
     legendarySpawnList = loadSpawnList("config/legendaryspawns.txt");
@@ -71,6 +78,8 @@ public class LegendarySpawner {
     defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_SPAWN_ANNOUNCEMENT, "&cAn &dUltra Beast &3%ultrabeast% &chas spawned nearby &3%player%&c!");
     defaultConfiguration.addProperty(ConfigKey.LEGENDARY_CAPTURE_ANNOUNCEMENT, "&cThe &eLegendary &3%legendary% &chas been captured by &3%player%&c!");
     defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_CAPTURE_ANNOUNCEMENT, "&cThe &dUltra Beast &3%ultrabeast% &chas been captured by &3%player%&c!");
+    defaultConfiguration.addProperty(ConfigKey.LEGENDARY_SPAWN_CHANCE, 1f);
+    defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_SPAWN_CHANCE, 1f);
 
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     JsonObject configuration;
@@ -105,6 +114,8 @@ public class LegendarySpawner {
     this.ultraBeastSpawnAnnouncement = finalConfiguration.get(ConfigKey.ULTRA_BEAST_SPAWN_ANNOUNCEMENT).getAsString();
     this.legendaryCaptureAnnouncement = finalConfiguration.get(ConfigKey.LEGENDARY_CAPTURE_ANNOUNCEMENT).getAsString();
     this.ultraBeastCaptureAnnouncement = finalConfiguration.get(ConfigKey.ULTRA_BEAST_CAPTURE_ANNOUNCEMENT).getAsString();
+    this.legendarySpawnChance = finalConfiguration.get(ConfigKey.LEGENDARY_SPAWN_CHANCE).getAsFloat();
+    this.ultraBeastSpawnChance = finalConfiguration.get(ConfigKey.ULTRA_BEAST_SPAWN_CHANCE).getAsFloat();
     this.spawnCountdown = spawnIntervalTicks;
     LightingStriker.getInstance().setStrikeInterval(
         spawnIntervalTicks / finalConfiguration.get(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN).getAsInt()
@@ -156,8 +167,8 @@ public class LegendarySpawner {
   public void tick() {
     if (spawnCountdown > 0) spawnCountdown--;
     else {
-      spawnFromGroup(legendarySpawnList, legendarySpawnAnnouncement, legendaryCaptureAnnouncement);
-      spawnFromGroup(ultraBeastSpawnList, ultraBeastSpawnAnnouncement, ultraBeastCaptureAnnouncement);
+      if (Math.random() < legendarySpawnChance) spawnFromGroup(legendarySpawnList, legendarySpawnAnnouncement, legendaryCaptureAnnouncement);
+      if (Math.random() < ultraBeastSpawnChance) spawnFromGroup(ultraBeastSpawnList, ultraBeastSpawnAnnouncement, ultraBeastCaptureAnnouncement);
       spawnCountdown = spawnIntervalTicks;
     }
     LightingStriker.getInstance().tick();
@@ -206,7 +217,6 @@ public class LegendarySpawner {
         spawnLevel = chosenPlayerSpawnLevel;
         break;
       }
-
     }
 
     Pokemon legendary = new Pokemon();
@@ -221,9 +231,21 @@ public class LegendarySpawner {
     );
     pokemonEntity.setDespawner(LegendaryDespawner.getInstance());
     pokemonEntity.setPos(spawnPos);
-    new LegendaryCaptureListener(pokemonEntity, captureAnnouncement, server).start();
     LightingStriker.getInstance().addTracked(pokemonEntity);
     spawnLevel.addFreshEntity(pokemonEntity);
+
+    CobblemonEvents.POKEMON_CAPTURED.subscribe(Priority.NORMAL, (pokemonCapturedEvent) -> {
+        if (pokemonCapturedEvent.component1().getUuid() == pokemonEntity.getPokemon().getUuid()) {
+          server.getPlayerList().broadcastSystemMessage(
+              Component.literal(ChatColourUtils.format(captureAnnouncement)
+                  .replaceAll(ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN, pokemonEntity.getPokemon().getSpecies().getTranslatedName().getString())
+                  .replaceAll(ConfigKey.PLAYER_TOKEN, pokemonCapturedEvent.component2().getDisplayName().getString())
+              ),
+              false
+          );
+        }
+        return Unit.INSTANCE;
+    }).unsubscribeWhen(5f, pokemonEntity::isRemoved);
 
     try {
       server.getPlayerList().broadcastSystemMessage(
