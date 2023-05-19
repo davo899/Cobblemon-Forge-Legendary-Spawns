@@ -4,17 +4,17 @@ import com.cobblemon.mod.common.CobblemonEntities;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.mojang.logging.LogUtils;
+import com.selfdot.cobblemon.legendaryspawns.spawnlocation.RandomNearbyPoint;
+import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnLocationSelector;
+import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnSafetyCondition;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.material.Material;
 import net.minecraft.world.phys.Vec3;
 
-import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,14 +25,15 @@ public class LegendarySpawner {
   private final MinecraftServer server;
   private final List<LegendarySpawn> legendarySpawnList;
   private final int spawnIntervalTicks;
-  private final int minimumSpawnDistance;
-  private final int maximumSpawnDistance;
   private final int maximumSpawnAttempts;
   private final int minimumRequiredPlayers;
   private final int shinyOdds;
 
   private int spawnCountdown;
   private final LightingStriker lightingStriker;
+  private final SpawnLocationSelector spawnLocationSelector;
+  private final List<SpawnSafetyCondition> spawnSafetyConditions = new ArrayList<>();
+  private final LegendaryDespawner legendaryDespawner;
 
   public LegendarySpawner(
       MinecraftServer server,
@@ -48,14 +49,13 @@ public class LegendarySpawner {
     this.server = server;
     this.legendarySpawnList = legendarySpawnList;
     this.spawnIntervalTicks = spawnIntervalSeconds * TICKS_PER_SECOND;
-    this.minimumSpawnDistance = minimumSpawnDistance;
-    this.maximumSpawnDistance = maximumSpawnDistance;
     this.maximumSpawnAttempts = maximumSpawnAttempts;
     this.minimumRequiredPlayers = minimumRequiredPlayers;
     this.shinyOdds = shinyOdds;
+    this.spawnCountdown = spawnIntervalTicks;
     this.lightingStriker = new LightingStriker(spawnIntervalTicks / lightningStrikesPerSpawn);
-
-    spawnCountdown = spawnIntervalTicks;
+    this.spawnLocationSelector = new RandomNearbyPoint(minimumSpawnDistance, maximumSpawnDistance);
+    this.legendaryDespawner = new LegendaryDespawner(minimumSpawnDistance, spawnIntervalTicks);
   }
 
   public void tick() {
@@ -98,7 +98,7 @@ public class LegendarySpawner {
 
       if (chosenPlayerOpt.isPresent()) {
         ServerPlayer chosenPlayer = chosenPlayerOpt.get();
-        spawnPos = randomNearbySurfacePoint(chosenPlayer.level, chosenPlayer.getPosition(0f));
+        spawnPos = spawnLocationSelector.getSpawnLocation(chosenPlayer.level, chosenPlayer.getPosition(0f));
         spawnLevel = chosenPlayer.level;
       }
     }
@@ -113,7 +113,7 @@ public class LegendarySpawner {
         legendary,
         CobblemonEntities.POKEMON.get()
     );
-    pokemonEntity.setDespawner(new LegendaryDespawner(minimumSpawnDistance, spawnIntervalTicks));
+    pokemonEntity.setDespawner(legendaryDespawner);
     pokemonEntity.setPos(spawnPos);
     spawnLevel.addFreshEntity(pokemonEntity);
 
@@ -125,22 +125,5 @@ public class LegendarySpawner {
             .append(" has spawned!"),
         false
     );
-  }
-
-  @Nullable
-  private Vec3 randomNearbySurfacePoint(Level level, Vec3 centre) {
-    double dist = minimumSpawnDistance + ((maximumSpawnDistance - minimumSpawnDistance) * Math.random());
-    double theta = 2 * Math.PI * Math.random();
-    double x = centre.x + (dist * Math.cos(theta));
-    double z = centre.z + (dist * Math.sin(theta));
-    BlockPos pos = new BlockPos(x, centre.y, z);
-    while (level.getBlockState(pos).getMaterial().equals(Material.AIR) && level.isInWorldBounds(pos)) pos = pos.below();
-    while (!level.getBlockState(pos).getMaterial().equals(Material.AIR) && level.isInWorldBounds(pos)) pos = pos.above();
-    return level.isInWorldBounds(pos) && !isUnsafeSpawn(level, pos) ? new Vec3(x, pos.getY(), z) : null;
-  }
-
-  private boolean isUnsafeSpawn(Level level, BlockPos pos) {
-    while (level.getBlockState(pos).getMaterial().equals(Material.AIR) && level.isInWorldBounds(pos)) pos = pos.below();
-    return level.getBlockState(pos).getFluidState().is(FluidTags.LAVA);
   }
 }
