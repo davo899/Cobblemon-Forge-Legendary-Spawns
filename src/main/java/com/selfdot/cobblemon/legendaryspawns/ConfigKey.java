@@ -10,5 +10,11 @@ public class ConfigKey {
   public static final String SHINY_ODDS = "shinyOdds";
   public static final String LIGHTNING_STRIKES_PER_SPAWN = "lightningStrikesPerSpawn";
   public static final String LEGENDARY_SPAWN_ANNOUNCEMENT = "legendarySpawnAnnouncement";
+  public static final String ULTRA_BEAST_SPAWN_ANNOUNCEMENT = "ultraBeastSpawnAnnouncement";
+  public static final String LEGENDARY_CAPTURE_ANNOUNCEMENT = "legendaryCaptureAnnouncement";
+  public static final String ULTRA_BEAST_CAPTURE_ANNOUNCEMENT = "ultraBeastCaptureAnnouncement";
+
+  public static final String LEGENDARY_OR_ULTRA_BEAST_TOKEN = "%(legendary|ultrabeast)%";
+  public static final String PLAYER_TOKEN = "%player%";
 
 }

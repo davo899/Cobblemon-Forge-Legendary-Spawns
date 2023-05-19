@@ -1,5 +1,7 @@
 package com.selfdot.cobblemon.legendaryspawns;
 
+import com.cobblemon.mod.common.api.events.CobblemonEvents;
+import com.cobblemon.mod.common.api.events.pokemon.PokemonCapturedEvent;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -54,4 +56,5 @@ public class LegendarySpawnsMod {
     new ReloadCommand(event.getDispatcher());
     ConfigCommand.register(event.getDispatcher());
   }
+
 }
