@@ -1,7 +1,6 @@
 package com.selfdot.cobblemon.legendaryspawns.spawnlocation;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Material;
 import net.minecraft.world.phys.Vec3;
@@ -18,11 +17,6 @@ public class RandomNearbyPoint implements SpawnLocationSelector {
     this.maximumSpawnDistance = maximumSpawnDistance;
   }
 
-  private boolean isUnsafeSpawn(Level level, BlockPos pos) {
-    while (level.getBlockState(pos).getMaterial().equals(Material.AIR) && level.isInWorldBounds(pos)) pos = pos.below();
-    return level.getBlockState(pos).getFluidState().is(FluidTags.LAVA);
-  }
-
   @Nullable
   @Override
   public Vec3 getSpawnLocation(Level level, Vec3 centre) {
@@ -33,6 +27,6 @@ public class RandomNearbyPoint implements SpawnLocationSelector {
     BlockPos pos = new BlockPos(x, centre.y, z);
     while (level.getBlockState(pos).getMaterial().equals(Material.AIR) && level.isInWorldBounds(pos)) pos = pos.below();
     while (!level.getBlockState(pos).getMaterial().equals(Material.AIR) && level.isInWorldBounds(pos)) pos = pos.above();
-    return level.isInWorldBounds(pos) && !isUnsafeSpawn(level, pos) ? new Vec3(x, pos.getY(), z) : null;
+    return level.isInWorldBounds(pos) ? new Vec3(x, pos.getY(), z) : null;
   }
 }

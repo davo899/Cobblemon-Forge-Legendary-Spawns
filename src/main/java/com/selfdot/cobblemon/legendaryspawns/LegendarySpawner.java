@@ -7,11 +7,16 @@ import com.mojang.logging.LogUtils;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.RandomNearbyPoint;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnLocationSelector;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnSafetyCondition;
+import com.selfdot.cobblemon.legendaryspawns.spawnlocation.UnsafeFloorBlocks;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BiomeTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Material;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -32,7 +37,7 @@ public class LegendarySpawner {
   private int spawnCountdown;
   private final LightingStriker lightingStriker;
   private final SpawnLocationSelector spawnLocationSelector;
-  private final List<SpawnSafetyCondition> spawnSafetyConditions = new ArrayList<>();
+  private final List<SpawnSafetyCondition> spawnSafetyConditions;
   private final LegendaryDespawner legendaryDespawner;
 
   public LegendarySpawner(
@@ -55,6 +60,7 @@ public class LegendarySpawner {
     this.spawnCountdown = spawnIntervalTicks;
     this.lightingStriker = new LightingStriker(spawnIntervalTicks / lightningStrikesPerSpawn);
     this.spawnLocationSelector = new RandomNearbyPoint(minimumSpawnDistance, maximumSpawnDistance);
+    this.spawnSafetyConditions = List.of(new UnsafeFloorBlocks(List.of(Material.FIRE, Material.LAVA, Material.CACTUS)));
     this.legendaryDespawner = new LegendaryDespawner(minimumSpawnDistance, spawnIntervalTicks);
   }
 
@@ -81,10 +87,10 @@ public class LegendarySpawner {
     else return;
 
     int attemptedSpawns = 0;
-    Level spawnLevel = null;
-    Vec3 spawnPos = null;
+    Level spawnLevel;
+    Vec3 spawnPos;
 
-    while (spawnPos == null) {
+    while (true) {
       if (++attemptedSpawns > maximumSpawnAttempts) {
         LogUtils.getLogger().info("Skipping Legendary spawn: Could not find safe spawn location after " +
             maximumSpawnAttempts + " attempts");
@@ -98,8 +104,16 @@ public class LegendarySpawner {
 
       if (chosenPlayerOpt.isPresent()) {
         ServerPlayer chosenPlayer = chosenPlayerOpt.get();
-        spawnPos = spawnLocationSelector.getSpawnLocation(chosenPlayer.level, chosenPlayer.getPosition(0f));
-        spawnLevel = chosenPlayer.level;
+        final Level chosenPlayerSpawnLevel = chosenPlayer.level;
+        final Vec3 spawnLocation = spawnLocationSelector.getSpawnLocation(
+            chosenPlayer.level, chosenPlayer.getPosition(0f)
+        );
+        if (spawnLocation == null) continue;
+        BlockPos finalSpawnPos = new BlockPos(spawnLocation);
+        if (spawnSafetyConditions.stream().anyMatch(condition -> !condition.isSafe(chosenPlayerSpawnLevel, finalSpawnPos))) continue;
+        spawnPos = spawnLocation;
+        spawnLevel = chosenPlayerSpawnLevel;
+        break;
       }
     }
 
