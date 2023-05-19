@@ -6,6 +6,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.Species;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
@@ -27,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class LegendarySpawner {
 
@@ -46,6 +49,7 @@ public class LegendarySpawner {
   private int maximumSpawnAttempts;
   private int minimumRequiredPlayers;
   private int shinyOdds;
+  private String legendarySpawnAnnouncement;
 
   public boolean loadConfig() {
     legendarySpawnList = new ArrayList<>();
@@ -82,8 +86,9 @@ public class LegendarySpawner {
     defaultConfiguration.addProperty(ConfigKey.MAXIMUM_SPAWN_ATTEMPTS, 5);
     defaultConfiguration.addProperty(ConfigKey.SHINY_ODDS, 4096);
     defaultConfiguration.addProperty(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN, 6);
+    defaultConfiguration.addProperty(ConfigKey.LEGENDARY_SPAWN_ANNOUNCEMENT, "&cA &eLegendary &3%legendary% &chas spawned nearby &3%player%&c!");
 
-    Gson gson = new Gson();
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
     JsonObject configuration;
     try {
       configuration = JsonParser.parseReader(new FileReader("config/legendaryspawnsConfig.json"))
@@ -112,6 +117,7 @@ public class LegendarySpawner {
     this.maximumSpawnAttempts = finalConfiguration.get(ConfigKey.MAXIMUM_SPAWN_ATTEMPTS).getAsInt();
     this.minimumRequiredPlayers = finalConfiguration.get(ConfigKey.MINIMUM_REQUIRED_PLAYERS).getAsInt();
     this.shinyOdds = finalConfiguration.get(ConfigKey.SHINY_ODDS).getAsInt();
+    this.legendarySpawnAnnouncement = finalConfiguration.get(ConfigKey.LEGENDARY_SPAWN_ANNOUNCEMENT).getAsString();
     this.spawnCountdown = spawnIntervalTicks;
     LightingStriker.getInstance().setStrikeInterval(
         spawnIntervalTicks / finalConfiguration.get(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN).getAsInt()
@@ -154,6 +160,7 @@ public class LegendarySpawner {
     int attemptedSpawns = 0;
     Level spawnLevel;
     Vec3 spawnPos;
+    ServerPlayer chosenPlayer;
 
     while (true) {
       if (++attemptedSpawns > maximumSpawnAttempts) {
@@ -168,7 +175,7 @@ public class LegendarySpawner {
           .findFirst();
 
       if (chosenPlayerOpt.isPresent()) {
-        ServerPlayer chosenPlayer = chosenPlayerOpt.get();
+        chosenPlayer = chosenPlayerOpt.get();
         final Level chosenPlayerSpawnLevel = chosenPlayer.level;
         final Vec3 spawnLocation = spawnLocationSelector.getSpawnLocation(
             chosenPlayer.level, chosenPlayer.getPosition(0f)
@@ -180,6 +187,7 @@ public class LegendarySpawner {
         spawnLevel = chosenPlayerSpawnLevel;
         break;
       }
+
     }
 
     Pokemon legendary = new Pokemon();
@@ -199,9 +207,10 @@ public class LegendarySpawner {
     LightingStriker.getInstance().setTracked(pokemonEntity);
 
     server.getPlayerList().broadcastSystemMessage(
-        Component.literal("A Legendary ")
-            .append(pokemonEntity.getPokemon().getSpecies().getTranslatedName().withStyle(ChatFormatting.GOLD))
-            .append(" has spawned!"),
+        Component.literal(ChatColourUtils.format(legendarySpawnAnnouncement)
+            .replaceAll("%legendary%", pokemonEntity.getPokemon().getSpecies().getTranslatedName().getString())
+            .replaceAll("%player%", chosenPlayer.getDisplayName().getString())
+        ),
         false
     );
   }
