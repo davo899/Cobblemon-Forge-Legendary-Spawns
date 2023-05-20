@@ -3,9 +3,8 @@ package com.selfdot.cobblemon.legendaryspawns;
 import com.cobblemon.mod.common.CobblemonEntities;
 import com.cobblemon.mod.common.api.Priority;
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
-import com.cobblemon.mod.common.api.events.pokemon.PokemonCapturedEvent;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
-import com.cobblemon.mod.common.api.reactive.ObservableSubscription;
+import com.cobblemon.mod.common.entity.pokemon.PokemonBehaviourFlag;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.Species;
@@ -14,15 +13,13 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
-import com.selfdot.cobblemon.legendaryspawns.spawnlocation.RandomNearbyPoint;
-import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnLocationSelector;
-import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnSafetyCondition;
-import com.selfdot.cobblemon.legendaryspawns.spawnlocation.UnsafeFloorBlocks;
+import com.selfdot.cobblemon.legendaryspawns.spawnlocation.*;
 import kotlin.Unit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Material;
 import net.minecraft.world.phys.Vec3;
@@ -71,7 +68,7 @@ public class LegendarySpawner {
     defaultConfiguration.addProperty(ConfigKey.MINIMUM_SPAWN_DISTANCE, 32);
     defaultConfiguration.addProperty(ConfigKey.MAXIMUM_SPAWN_DISTANCE, 128);
     defaultConfiguration.addProperty(ConfigKey.MINIMUM_REQUIRED_PLAYERS, 1);
-    defaultConfiguration.addProperty(ConfigKey.MAXIMUM_SPAWN_ATTEMPTS, 5);
+    defaultConfiguration.addProperty(ConfigKey.MAXIMUM_SPAWN_ATTEMPTS, 10);
     defaultConfiguration.addProperty(ConfigKey.SHINY_ODDS, 4096);
     defaultConfiguration.addProperty(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN, 6);
     defaultConfiguration.addProperty(ConfigKey.LEGENDARY_SPAWN_ANNOUNCEMENT, "&cA &eLegendary &3%legendary% &chas spawned nearby &3%player%&c!");
@@ -120,10 +117,13 @@ public class LegendarySpawner {
     LightingStriker.getInstance().setStrikeInterval(
         spawnIntervalTicks / finalConfiguration.get(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN).getAsInt()
     );
-    this.spawnLocationSelector = new RandomNearbyPoint(
+    this.spawnLocationSelector = new RandomNearbySurfacePoint(
         minimumSpawnDistance, finalConfiguration.get(ConfigKey.MAXIMUM_SPAWN_DISTANCE).getAsInt()
     );
-    this.spawnSafetyConditions = List.of(new UnsafeFloorBlocks(List.of(Material.FIRE, Material.LAVA, Material.CACTUS)));
+    this.spawnSafetyConditions = List.of(
+        new UnsafeFloorBlocks(List.of(Material.FIRE, Material.LAVA, Material.CACTUS)),
+        new AboveYLevel(60)
+    );
     LegendaryDespawner.getInstance().setMinimumDespawnDistance(minimumSpawnDistance);
     LegendaryDespawner.getInstance().setSpawnIntervalTicks(spawnIntervalTicks);
     return true;
@@ -224,11 +224,7 @@ public class LegendarySpawner {
     legendary.setLevel(chosenLegendary.level);
     if (Math.random() < (1d / shinyOdds)) legendary.setShiny(true);
 
-    PokemonEntity pokemonEntity = new PokemonEntity(
-        spawnLevel,
-        legendary,
-        CobblemonEntities.POKEMON.get()
-    );
+    PokemonEntity pokemonEntity = new PokemonEntity(spawnLevel, legendary, CobblemonEntities.POKEMON.get());
     pokemonEntity.setDespawner(LegendaryDespawner.getInstance());
     pokemonEntity.setPos(spawnPos);
     LightingStriker.getInstance().addTracked(pokemonEntity);
@@ -237,27 +233,33 @@ public class LegendarySpawner {
     CobblemonEvents.POKEMON_CAPTURED.subscribe(Priority.NORMAL, (pokemonCapturedEvent) -> {
         if (pokemonCapturedEvent.component1().getUuid() == pokemonEntity.getPokemon().getUuid()) {
           server.getPlayerList().broadcastSystemMessage(
-              Component.literal(ChatColourUtils.format(captureAnnouncement)
-                  .replaceAll(ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN, pokemonEntity.getPokemon().getSpecies().getTranslatedName().getString())
-                  .replaceAll(ConfigKey.PLAYER_TOKEN, pokemonCapturedEvent.component2().getDisplayName().getString())
-              ),
+              formattedAnnouncement(captureAnnouncement, pokemonEntity, pokemonCapturedEvent.component2()),
               false
           );
         }
         return Unit.INSTANCE;
-    }).unsubscribeWhen(5f, pokemonEntity::isRemoved);
+    }).unsubscribeWhen(5f, () ->
+        (pokemonEntity.isRemoved() && pokemonEntity.getRemovalReason() == Entity.RemovalReason.DISCARDED) ||
+            pokemonEntity.getPokemon().isPlayerOwned()
+    );
 
     try {
       server.getPlayerList().broadcastSystemMessage(
-          Component.literal(ChatColourUtils.format(spawnAnnouncement)
-              .replaceAll(ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN, pokemonEntity.getPokemon().getSpecies().getTranslatedName().getString())
-              .replaceAll(ConfigKey.PLAYER_TOKEN, chosenPlayer.getDisplayName().getString())
-          ),
-          false
+          formattedAnnouncement(spawnAnnouncement, pokemonEntity, chosenPlayer), false
       );
     } catch (IllegalArgumentException e) {
       e.printStackTrace();
     }
+  }
+
+  public Component formattedAnnouncement(String announcement, PokemonEntity pokemonEntity, ServerPlayer player) {
+    return Component.literal(ChatColourUtils.format(announcement)
+        .replaceAll(
+            ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN,
+            pokemonEntity.getPokemon().getSpecies().getTranslatedName().getString()
+        )
+        .replaceAll(ConfigKey.PLAYER_TOKEN, player.getDisplayName().getString())
+    );
   }
 
 }
