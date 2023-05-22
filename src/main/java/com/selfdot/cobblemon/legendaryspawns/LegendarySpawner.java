@@ -4,7 +4,6 @@ import com.cobblemon.mod.common.CobblemonEntities;
 import com.cobblemon.mod.common.api.Priority;
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
-import com.cobblemon.mod.common.entity.pokemon.PokemonBehaviourFlag;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.Species;
@@ -19,7 +18,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Material;
 import net.minecraft.world.phys.Vec3;
@@ -34,7 +32,26 @@ import java.util.Scanner;
 public class LegendarySpawner {
 
   private static final LegendarySpawner instance = new LegendarySpawner();
-  private LegendarySpawner() { }
+  private LegendarySpawner() {
+    CobblemonEvents.POKEMON_CAPTURED.subscribe(Priority.NORMAL, (pokemonCapturedEvent) -> {
+      Pokemon caught = pokemonCapturedEvent.component1();
+      ServerPlayer player = pokemonCapturedEvent.component2();
+      if (legendarySpawnList.stream().anyMatch(legendarySpawn -> legendarySpawn.species == caught.getSpecies())) {
+        server.getPlayerList().broadcastSystemMessage(
+            formattedAnnouncement(legendaryCaptureAnnouncement, caught, player),
+            false
+        );
+      } else if (
+          ultraBeastSpawnList.stream().anyMatch(legendarySpawn -> legendarySpawn.species == caught.getSpecies())
+      ) {
+        server.getPlayerList().broadcastSystemMessage(
+            formattedAnnouncement(ultraBeastCaptureAnnouncement, caught, player),
+            false
+        );
+      }
+      return Unit.INSTANCE;
+    });
+  }
   public static LegendarySpawner getInstance() { return instance; }
 
   private static final int TICKS_PER_SECOND = 40;
@@ -122,7 +139,9 @@ public class LegendarySpawner {
     );
     this.spawnSafetyConditions = List.of(
         new UnsafeFloorBlocks(List.of(Material.FIRE, Material.LAVA, Material.CACTUS)),
-        new AboveYLevel(60)
+        new AboveYLevel(60),
+        new BelowYLevel(200),
+        new SkyVisible(true)
     );
     LegendaryDespawner.getInstance().setMinimumDespawnDistance(minimumSpawnDistance);
     LegendaryDespawner.getInstance().setSpawnIntervalTicks(spawnIntervalTicks);
@@ -164,11 +183,17 @@ public class LegendarySpawner {
     this.server = server;
   }
 
+  private float scaledChance(float base) {
+    return base + (0.02f * (server.getPlayerCount() - minimumRequiredPlayers));
+  }
+
   public void tick() {
     if (spawnCountdown > 0) spawnCountdown--;
     else {
-      if (Math.random() < legendarySpawnChance) spawnFromGroup(legendarySpawnList, legendarySpawnAnnouncement, legendaryCaptureAnnouncement);
-      if (Math.random() < ultraBeastSpawnChance) spawnFromGroup(ultraBeastSpawnList, ultraBeastSpawnAnnouncement, ultraBeastCaptureAnnouncement);
+      if (Math.random() < scaledChance(legendarySpawnChance))
+        spawnFromGroup(legendarySpawnList, legendarySpawnAnnouncement, legendaryCaptureAnnouncement);
+      if (Math.random() < scaledChance(ultraBeastSpawnChance))
+        spawnFromGroup(ultraBeastSpawnList, ultraBeastSpawnAnnouncement, ultraBeastCaptureAnnouncement);
       spawnCountdown = spawnIntervalTicks;
     }
     LightingStriker.getInstance().tick();
@@ -230,34 +255,18 @@ public class LegendarySpawner {
     LightingStriker.getInstance().addTracked(pokemonEntity);
     spawnLevel.addFreshEntity(pokemonEntity);
 
-    CobblemonEvents.POKEMON_CAPTURED.subscribe(Priority.NORMAL, (pokemonCapturedEvent) -> {
-        if (pokemonCapturedEvent.component1().getUuid() == pokemonEntity.getPokemon().getUuid()) {
-          server.getPlayerList().broadcastSystemMessage(
-              formattedAnnouncement(captureAnnouncement, pokemonEntity, pokemonCapturedEvent.component2()),
-              false
-          );
-        }
-        return Unit.INSTANCE;
-    }).unsubscribeWhen(5f, () ->
-        (pokemonEntity.isRemoved() && pokemonEntity.getRemovalReason() == Entity.RemovalReason.DISCARDED) ||
-            pokemonEntity.getPokemon().isPlayerOwned()
-    );
-
     try {
       server.getPlayerList().broadcastSystemMessage(
-          formattedAnnouncement(spawnAnnouncement, pokemonEntity, chosenPlayer), false
+          formattedAnnouncement(spawnAnnouncement, pokemonEntity.getPokemon(), chosenPlayer), false
       );
     } catch (IllegalArgumentException e) {
       e.printStackTrace();
     }
   }
 
-  public Component formattedAnnouncement(String announcement, PokemonEntity pokemonEntity, ServerPlayer player) {
+  public Component formattedAnnouncement(String announcement, Pokemon pokemon, ServerPlayer player) {
     return Component.literal(ChatColourUtils.format(announcement)
-        .replaceAll(
-            ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN,
-            pokemonEntity.getPokemon().getSpecies().getTranslatedName().getString()
-        )
+        .replaceAll(ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN, pokemon.getSpecies().getTranslatedName().getString())
         .replaceAll(ConfigKey.PLAYER_TOKEN, player.getDisplayName().getString())
     );
   }

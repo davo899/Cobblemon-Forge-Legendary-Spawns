@@ -9,8 +9,6 @@ import javax.annotation.Nullable;
 
 public class RandomNearbySurfacePoint implements SpawnLocationSelector {
 
-  private static final int SEA_LEVEL = 64;
-
   private final int minimumSpawnDistance;
   private final int maximumSpawnDistance;
 
@@ -26,7 +24,7 @@ public class RandomNearbySurfacePoint implements SpawnLocationSelector {
     double theta = 2 * Math.PI * Math.random();
     double x = centre.x + (dist * Math.cos(theta));
     double z = centre.z + (dist * Math.sin(theta));
-    BlockPos pos = new BlockPos(x, SEA_LEVEL, z);
+    BlockPos pos = new BlockPos(x, level.getMaxBuildHeight() - 1, z);
     while (level.getBlockState(pos).getMaterial().equals(Material.AIR) && level.isInWorldBounds(pos)) pos = pos.below();
     while (!level.getBlockState(pos).getMaterial().equals(Material.AIR) && level.isInWorldBounds(pos)) pos = pos.above();
     return level.isInWorldBounds(pos) ? new Vec3(x, pos.getY(), z) : null;

@@ -27,7 +27,7 @@ public class LegendaryDespawner implements Despawner<PokemonEntity> {
   @Override
   public boolean shouldDespawn(@NotNull PokemonEntity pokemonEntity) {
     if (pokemonEntity.getTicksLived() < spawnIntervalTicks) return false;
-
+    if (pokemonEntity.isBusy()) return false;
     return !pokemonEntity.level.hasNearbyAlivePlayer(
         pokemonEntity.getX(),
         pokemonEntity.getY(),

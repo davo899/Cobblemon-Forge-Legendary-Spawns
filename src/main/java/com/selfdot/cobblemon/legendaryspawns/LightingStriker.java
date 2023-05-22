@@ -35,16 +35,13 @@ public class LightingStriker {
       tracked = tracked.stream().filter(e -> !e.isRemoved()).collect(Collectors.toList());
       for (Entity entity : tracked) {
         LightningBolt lightningEntity = new LightningBolt(EntityType.LIGHTNING_BOLT, entity.level);
+        lightningEntity.setVisualOnly(true);
         Vec3 strikePos = entity.position().add(0, 5, 0);
         lightningEntity.setPos(strikePos);
         entity.level.addFreshEntity(lightningEntity);
       }
       strikeCountdown = strikeInterval;
     }
-  }
-
-  private static void strikeTracked(Entity tracked) {
-
   }
 
 }
