@@ -15,8 +15,6 @@ public class ConfigKey {
     public static final String CAPTURE_ANNOUNCEMENT = "captureAnnouncement";
     public static final String SPAWN_CHANCE = "spawnChance";
     public static final String SPAWN_LIST_FILENAME = "spawnListFilename";
-    public static final String DISPLAY_NAME = "displayName";
-    public static final String POOL_TOKEN = "%pool%";
     public static final String POKEMON_TOKEN = "%pokemon%";
     public static final String PLAYER_TOKEN = "%player%";
 

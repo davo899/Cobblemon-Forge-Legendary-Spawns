@@ -43,20 +43,13 @@ public class LegendarySpawner {
     defaultConfiguration.addProperty(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN, 6);
     defaultConfiguration.add(ConfigKey.SPAWN_POOLS, new JsonArray());
 
-    /*
-    defaultConfiguration.addProperty(ConfigKey.LEGENDARY_SPAWN_ANNOUNCEMENT, "&cA &eLegendary &3%legendary% &chas spawned nearby &3%player%&c!");
-    defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_SPAWN_ANNOUNCEMENT, "&cAn &dUltra Beast &3%ultrabeast% &chas spawned nearby &3%player%&c!");
-    defaultConfiguration.addProperty(ConfigKey.LEGENDARY_CAPTURE_ANNOUNCEMENT, "&cThe &eLegendary &3%legendary% &chas been captured by &3%player%&c!");
-    defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_CAPTURE_ANNOUNCEMENT, "&cThe &dUltra Beast &3%ultrabeast% &chas been captured by &3%player%&c!");
-    */
-
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     JsonObject configuration;
     try {
       configuration = JsonParser.parseReader(new FileReader(ConfigKey.CONFIG_LOCATION))
           .getAsJsonObject();
     } catch (FileNotFoundException e) {
-      LogUtils.getLogger().warn("Config not found, attempting to generate default");
+      LegendarySpawnsMod.LOGGER.warn("Config not found, attempting to generate default");
       configuration = new JsonObject();
     }
     final JsonObject finalConfiguration = configuration;
@@ -65,7 +58,7 @@ public class LegendarySpawner {
     defaultConfiguration.keySet().stream()
         .filter(k -> !finalConfiguration.has(k))
         .forEach(k -> {
-          LogUtils.getLogger().warn("Config key " + k + " missing, applying default value: " + defaultConfiguration.get(k));
+          LegendarySpawnsMod.LOGGER.warn("Config key " + k + " missing, applying default value: " + defaultConfiguration.get(k));
           finalConfiguration.add(k, defaultConfiguration.get(k));
         });
 
@@ -76,7 +69,7 @@ public class LegendarySpawner {
         gson.toJson(finalConfiguration, writer);
         writer.close();
       } catch (IOException e2) {
-        LogUtils.getLogger().error("Unable to generate config file");
+        LegendarySpawnsMod.LOGGER.error("Unable to generate config file");
         return false;
       }
     }

@@ -10,7 +10,6 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.Species;
 import com.google.gson.JsonObject;
-import com.mojang.logging.LogUtils;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnLocationSelector;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.SpawnSafetyCondition;
 import kotlin.Unit;
@@ -33,42 +32,34 @@ import static com.selfdot.cobblemon.legendaryspawns.ChatColourUtils.formattedAnn
 public class SpawnPool {
 
     private static final List<String> REQUIRED_MEMBERS = List.of(
-        ConfigKey.DISPLAY_NAME,
         ConfigKey.SPAWN_ANNOUNCEMENT,
         ConfigKey.CAPTURE_ANNOUNCEMENT,
         ConfigKey.SPAWN_CHANCE,
         ConfigKey.SPAWN_LIST_FILENAME
     );
-
-    private String displayName;
     private String spawnAnnouncement;
     private String captureAnnouncement;
     private float spawnChance;
     private List<LegendarySpawn> spawns;
     private ObservableSubscription<PokemonCapturedEvent> captureListener;
 
-    public String getDisplayName() {
-        return displayName;
-    }
-
     @Nullable
     public static SpawnPool loadSpawnPool(JsonObject jsonObject) {
         if (REQUIRED_MEMBERS.stream().anyMatch(required -> !jsonObject.has(required))) {
-            LogUtils.getLogger().error("Missing property in spawn pool");
+            LegendarySpawnsMod.LOGGER.error("Missing property in spawn pool");
             return null;
         }
 
         SpawnPool spawnPool = new SpawnPool();
         String spawnListFilename;
         try {
-            spawnPool.displayName = jsonObject.get(ConfigKey.DISPLAY_NAME).getAsString();
             spawnPool.spawnAnnouncement = jsonObject.get(ConfigKey.SPAWN_ANNOUNCEMENT).getAsString();
             spawnPool.captureAnnouncement = jsonObject.get(ConfigKey.CAPTURE_ANNOUNCEMENT).getAsString();
             spawnPool.spawnChance = jsonObject.get(ConfigKey.SPAWN_CHANCE).getAsFloat();
             spawnListFilename = jsonObject.get(ConfigKey.SPAWN_LIST_FILENAME).getAsString();
 
         } catch (ClassCastException e) {
-            LogUtils.getLogger().error("Incorrectly formatted property in spawn pool");
+            LegendarySpawnsMod.LOGGER.error("Incorrectly formatted property in spawn pool");
             e.printStackTrace();
             return null;
         }
@@ -101,17 +92,17 @@ public class SpawnPool {
             }
             configReader.close();
 
-            if (spawnList.isEmpty()) LogUtils.getLogger().warn("Spawn list " + filename + " is empty");
+            if (spawnList.isEmpty()) LegendarySpawnsMod.LOGGER.warn("Spawn list " + filename + " is empty");
             return spawnList;
 
         } catch (FileNotFoundException e) {
-            LogUtils.getLogger().error("Spawn list " + filename + " not found");
+            LegendarySpawnsMod.LOGGER.error("Spawn list " + filename + " not found");
             return new ArrayList<>();
         }
     }
 
     private static void logSkippingSpawn(String reason) {
-        LogUtils.getLogger().warn("Skipping spawn: " + reason);
+        LegendarySpawnsMod.LOGGER.warn("Skipping spawn: " + reason);
     }
 
     public void startCaptureListener(MinecraftServer server) {
@@ -120,7 +111,7 @@ public class SpawnPool {
             ServerPlayer player = pokemonCapturedEvent.component2();
             if (spawns.stream().anyMatch(spawn -> spawn.species == caught.getSpecies())) {
                 server.getPlayerList().broadcastSystemMessage(
-                    formattedAnnouncement(captureAnnouncement, this, caught, player),
+                    formattedAnnouncement(captureAnnouncement, caught, player),
                     false
                 );
             }
@@ -203,7 +194,7 @@ public class SpawnPool {
         spawnLevel.addFreshEntity(pokemonEntity);
 
         server.getPlayerList().broadcastSystemMessage(
-            formattedAnnouncement(spawnAnnouncement, this, pokemonEntity.getPokemon(), chosenPlayer), false
+            formattedAnnouncement(spawnAnnouncement, pokemonEntity.getPokemon(), chosenPlayer), false
         );
     }
 

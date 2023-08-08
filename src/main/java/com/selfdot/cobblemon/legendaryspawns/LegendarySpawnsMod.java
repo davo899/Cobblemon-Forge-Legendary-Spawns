@@ -23,7 +23,7 @@ public class LegendarySpawnsMod {
   // Define mod id in a common place for everything to reference
   public static final String MODID = "legendaryspawns";
   // Directly reference a slf4j logger
-  private static final Logger LOGGER = LogUtils.getLogger();
+  public static final Logger LOGGER = LogUtils.getLogger();
 
   public LegendarySpawnsMod() {
     IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
