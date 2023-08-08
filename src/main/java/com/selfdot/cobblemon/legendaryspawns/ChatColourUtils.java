@@ -1,6 +1,9 @@
 package com.selfdot.cobblemon.legendaryspawns;
 
+import com.cobblemon.mod.common.pokemon.Pokemon;
 import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 
 public class ChatColourUtils {
 
@@ -22,6 +25,13 @@ public class ChatColourUtils {
         .replace("&K", "" + ChatFormatting.OBFUSCATED).replace("&L", "" + ChatFormatting.BOLD)
         .replace("&M", "" + ChatFormatting.STRIKETHROUGH).replace("&N", "" + ChatFormatting.UNDERLINE)
         .replace("&O", "" + ChatFormatting.ITALIC).replace("&R", "" + ChatFormatting.RESET);
+  }
+
+  public static Component formattedAnnouncement(String announcement, Pokemon pokemon, ServerPlayer player) {
+    return Component.literal(ChatColourUtils.format(announcement)
+        .replaceAll(ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN, pokemon.getSpecies().getTranslatedName().getString())
+        .replaceAll(ConfigKey.PLAYER_TOKEN, player.getDisplayName().getString())
+    );
   }
 
 }

@@ -35,21 +35,31 @@ public class LegendarySpawnsMod {
     MinecraftForge.EVENT_BUS.register(this);
   }
 
-  private void commonSetup(final FMLCommonSetupEvent event) {
-    LOGGER.info("Setting up Legendary Spawns");
-  }
+  private void commonSetup(final FMLCommonSetupEvent event) { }
 
   @SubscribeEvent
   public void onServerStart(ServerStartingEvent event) {
-    LegendarySpawner legendarySpawner = LegendarySpawner.getInstance();
-    legendarySpawner.setServer(event.getServer());
-    if (legendarySpawner.loadConfig()) LOGGER.info("Loaded config successfully");
-    else LOGGER.error("Legendary Spawns failed to load config");
+    try {
+      LegendarySpawner legendarySpawner = LegendarySpawner.getInstance();
+      legendarySpawner.setServer(event.getServer());
+      if (legendarySpawner.loadConfig()) LOGGER.info("Loaded config successfully");
+      else LOGGER.error("Legendary Spawns failed to load config");
+
+    } catch (Throwable t) {
+      LOGGER.warn("An exception occurred in LegendarySpawns.onServerStart()");
+      t.printStackTrace();
+    }
   }
 
   @SubscribeEvent
   public void tick(TickEvent.ServerTickEvent event) {
-    LegendarySpawner.getInstance().tick();
+    try {
+      LegendarySpawner.getInstance().tick();
+
+    } catch (Throwable t) {
+      LOGGER.warn("An exception occurred in LegendarySpawns.tick()");
+      t.printStackTrace();
+    }
   }
 
   @SubscribeEvent

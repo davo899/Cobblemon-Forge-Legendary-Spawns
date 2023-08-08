@@ -15,7 +15,6 @@ import com.mojang.logging.LogUtils;
 import com.selfdot.cobblemon.legendaryspawns.spawnlocation.*;
 import kotlin.Unit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
@@ -28,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
+
+import static com.selfdot.cobblemon.legendaryspawns.ChatColourUtils.formattedAnnouncement;
 
 public class LegendarySpawner {
 
@@ -93,7 +94,6 @@ public class LegendarySpawner {
     defaultConfiguration.addProperty(ConfigKey.LEGENDARY_CAPTURE_ANNOUNCEMENT, "&cThe &eLegendary &3%legendary% &chas been captured by &3%player%&c!");
     defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_CAPTURE_ANNOUNCEMENT, "&cThe &dUltra Beast &3%ultrabeast% &chas been captured by &3%player%&c!");
     defaultConfiguration.addProperty(ConfigKey.LEGENDARY_SPAWN_CHANCE, 1f);
-    defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_SPAWN_CHANCE, 1f);
 
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     JsonObject configuration;
@@ -101,6 +101,7 @@ public class LegendarySpawner {
       configuration = JsonParser.parseReader(new FileReader("config/legendaryspawnsConfig.json"))
           .getAsJsonObject();
     } catch (FileNotFoundException e) {
+      LogUtils.getLogger().warn("Config not found, attempting to generate default");
       configuration = new JsonObject();
     }
     final JsonObject finalConfiguration = configuration;
@@ -108,7 +109,10 @@ public class LegendarySpawner {
     boolean rewriteConfigFile = defaultConfiguration.keySet().stream().anyMatch(k -> !finalConfiguration.has(k));
     defaultConfiguration.keySet().stream()
         .filter(k -> !finalConfiguration.has(k))
-        .forEach(k -> finalConfiguration.add(k, defaultConfiguration.get(k)));
+        .forEach(k -> {
+          LogUtils.getLogger().warn("Config key " + k + " missing, applying default value: " + defaultConfiguration.get(k));
+          finalConfiguration.add(k, defaultConfiguration.get(k));
+        });
 
     if (rewriteConfigFile) {
       try {
@@ -116,6 +120,7 @@ public class LegendarySpawner {
         gson.toJson(finalConfiguration, writer);
         writer.close();
       } catch (IOException e2) {
+        LogUtils.getLogger().error("Unable to generate config file");
         return false;
       }
     }
@@ -148,6 +153,7 @@ public class LegendarySpawner {
     return true;
   }
 
+
   @Nullable
   private List<LegendarySpawn> loadSpawnList(String filename) {
     List<LegendarySpawn> spawnList = new ArrayList<>();
@@ -172,9 +178,12 @@ public class LegendarySpawner {
         spawnList.add(new LegendarySpawn(species, level));
       }
       configReader.close();
+
+      if (spawnList.isEmpty()) LogUtils.getLogger().warn("Spawn list " + filename + " is empty");
       return spawnList;
 
     } catch (FileNotFoundException e) {
+      LogUtils.getLogger().warn("Spawn list " + filename + " not found");
       return null;
     }
   }
@@ -190,16 +199,22 @@ public class LegendarySpawner {
   public void tick() {
     if (spawnCountdown > 0) spawnCountdown--;
     else {
-      if (Math.random() < scaledChance(legendarySpawnChance))
-        spawnFromGroup(legendarySpawnList, legendarySpawnAnnouncement, legendaryCaptureAnnouncement);
-      if (Math.random() < scaledChance(ultraBeastSpawnChance))
-        spawnFromGroup(ultraBeastSpawnList, ultraBeastSpawnAnnouncement, ultraBeastCaptureAnnouncement);
+      if (Math.random() < scaledChance(legendarySpawnChance)) {
+        spawnFromGroup(legendarySpawnList, legendarySpawnAnnouncement);
+      }
+      if (Math.random() < scaledChance(ultraBeastSpawnChance)) {
+        spawnFromGroup(ultraBeastSpawnList, ultraBeastSpawnAnnouncement);
+      }
       spawnCountdown = spawnIntervalTicks;
     }
     LightingStriker.getInstance().tick();
   }
 
-  private void spawnFromGroup(List<LegendarySpawn> group, String spawnAnnouncement, String captureAnnouncement) {
+  private void logSkippingSpawn(String reason) {
+    LogUtils.getLogger().warn("Skipping spawn: " + reason);
+  }
+
+  private void spawnFromGroup(List<LegendarySpawn> group, String spawnAnnouncement) {
     List<ServerPlayer> players = server.getPlayerList().getPlayers();
     if (players.size() < minimumRequiredPlayers) return;
 
@@ -210,7 +225,10 @@ public class LegendarySpawner {
     LegendarySpawn chosenLegendary;
     if (chosenLegendaryOpt.isPresent())
       chosenLegendary = chosenLegendaryOpt.get();
-    else return;
+    else {
+      logSkippingSpawn("Empty spawn list");
+      return;
+    }
 
     int attemptedSpawns = 0;
     Level spawnLevel;
@@ -219,11 +237,10 @@ public class LegendarySpawner {
 
     while (true) {
       if (++attemptedSpawns > maximumSpawnAttempts) {
-        LogUtils.getLogger().info("Skipping Legendary spawn: Could not find safe spawn location after " +
-            maximumSpawnAttempts + " attempts");
+        logSkippingSpawn("Could not find safe spawn location after " + maximumSpawnAttempts + " attempts");
         return;
       }
-      // Choose random player
+
       Optional<ServerPlayer> chosenPlayerOpt = players.stream()
           .filter(player -> player.level.dimension() == Level.OVERWORLD)
           .skip((int) (players.size() * Math.random()))
@@ -247,27 +264,18 @@ public class LegendarySpawner {
     Pokemon legendary = new Pokemon();
     legendary.setSpecies(chosenLegendary.species);
     legendary.setLevel(chosenLegendary.level);
+    legendary.initializeMoveset(true);
     if (Math.random() < (1d / shinyOdds)) legendary.setShiny(true);
 
     PokemonEntity pokemonEntity = new PokemonEntity(spawnLevel, legendary, CobblemonEntities.POKEMON.get());
     pokemonEntity.setDespawner(LegendaryDespawner.getInstance());
     pokemonEntity.setPos(spawnPos);
     LightingStriker.getInstance().addTracked(pokemonEntity);
+    spawnLevel.getChunkAt(new BlockPos(spawnPos));
     spawnLevel.addFreshEntity(pokemonEntity);
 
-    try {
-      server.getPlayerList().broadcastSystemMessage(
-          formattedAnnouncement(spawnAnnouncement, pokemonEntity.getPokemon(), chosenPlayer), false
-      );
-    } catch (IllegalArgumentException e) {
-      e.printStackTrace();
-    }
-  }
-
-  public Component formattedAnnouncement(String announcement, Pokemon pokemon, ServerPlayer player) {
-    return Component.literal(ChatColourUtils.format(announcement)
-        .replaceAll(ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN, pokemon.getSpecies().getTranslatedName().getString())
-        .replaceAll(ConfigKey.PLAYER_TOKEN, player.getDisplayName().getString())
+    server.getPlayerList().broadcastSystemMessage(
+        formattedAnnouncement(spawnAnnouncement, pokemonEntity.getPokemon(), chosenPlayer), false
     );
   }
 
