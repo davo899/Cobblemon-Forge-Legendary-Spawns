@@ -20,6 +20,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
@@ -30,6 +31,15 @@ import java.util.Scanner;
 import static com.selfdot.cobblemon.legendaryspawns.ChatColourUtils.formattedAnnouncement;
 
 public class SpawnPool {
+
+    private static final List<String> REQUIRED_MEMBERS = List.of(
+        ConfigKey.DISPLAY_NAME,
+        ConfigKey.SPAWN_ANNOUNCEMENT,
+        ConfigKey.CAPTURE_ANNOUNCEMENT,
+        ConfigKey.SPAWN_CHANCE,
+        ConfigKey.SPAWN_LIST_FILENAME
+    );
+
     private String displayName;
     private String spawnAnnouncement;
     private String captureAnnouncement;
@@ -41,13 +51,26 @@ public class SpawnPool {
         return displayName;
     }
 
+    @Nullable
     public static SpawnPool loadSpawnPool(JsonObject jsonObject) {
+        if (REQUIRED_MEMBERS.stream().anyMatch(required -> !jsonObject.has(required))) return null;
+
         SpawnPool spawnPool = new SpawnPool();
-        spawnPool.displayName = jsonObject.get(ConfigKey.DISPLAY_NAME).getAsString();
-        spawnPool.spawnAnnouncement = jsonObject.get(ConfigKey.SPAWN_ANNOUNCEMENT).getAsString();
-        spawnPool.captureAnnouncement = jsonObject.get(ConfigKey.CAPTURE_ANNOUNCEMENT).getAsString();
-        spawnPool.spawnChance = jsonObject.get(ConfigKey.SPAWN_CHANCE).getAsFloat();
-        spawnPool.spawns = loadSpawnList("config/legendaryspawns/" + jsonObject.get(ConfigKey.SPAWN_LIST_FILENAME).getAsString());
+        String spawnListFilename;
+        try {
+            spawnPool.displayName = jsonObject.get(ConfigKey.DISPLAY_NAME).getAsString();
+            spawnPool.spawnAnnouncement = jsonObject.get(ConfigKey.SPAWN_ANNOUNCEMENT).getAsString();
+            spawnPool.captureAnnouncement = jsonObject.get(ConfigKey.CAPTURE_ANNOUNCEMENT).getAsString();
+            spawnPool.spawnChance = jsonObject.get(ConfigKey.SPAWN_CHANCE).getAsFloat();
+            spawnListFilename = jsonObject.get(ConfigKey.SPAWN_LIST_FILENAME).getAsString();
+
+        } catch (ClassCastException e) {
+            LogUtils.getLogger().error("Incorrectly formatted property in spawn pool");
+            e.printStackTrace();
+            return null;
+        }
+
+        spawnPool.spawns = loadSpawnList("config/legendaryspawns/" + spawnListFilename);
         return spawnPool;
     }
 
