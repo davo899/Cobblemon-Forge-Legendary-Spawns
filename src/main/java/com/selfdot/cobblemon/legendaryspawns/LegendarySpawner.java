@@ -7,6 +7,9 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.material.Material;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,6 +70,7 @@ public class LegendarySpawner {
 
     if (rewriteConfigFile) {
       try {
+        Files.createDirectories(Paths.get(ConfigKey.CONFIG_LOCATION).getParent());
         FileWriter writer = new FileWriter(ConfigKey.CONFIG_LOCATION);
         gson.toJson(finalConfiguration, writer);
         writer.close();
