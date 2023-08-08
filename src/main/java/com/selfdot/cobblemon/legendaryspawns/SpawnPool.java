@@ -53,7 +53,10 @@ public class SpawnPool {
 
     @Nullable
     public static SpawnPool loadSpawnPool(JsonObject jsonObject) {
-        if (REQUIRED_MEMBERS.stream().anyMatch(required -> !jsonObject.has(required))) return null;
+        if (REQUIRED_MEMBERS.stream().anyMatch(required -> !jsonObject.has(required))) {
+            LogUtils.getLogger().error("Missing property in spawn pool");
+            return null;
+        }
 
         SpawnPool spawnPool = new SpawnPool();
         String spawnListFilename;

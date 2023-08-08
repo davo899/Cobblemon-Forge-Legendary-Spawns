@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class LegendarySpawner {
 
@@ -91,6 +92,7 @@ public class LegendarySpawner {
     finalConfiguration.get(ConfigKey.SPAWN_POOLS).getAsJsonArray().iterator().forEachRemaining(
         (element) -> spawnPools.add(SpawnPool.loadSpawnPool(element.getAsJsonObject()))
     );
+    spawnPools.removeIf(Objects::isNull);
     spawnPools.forEach(spawnPool -> spawnPool.startCaptureListener(server));
 
     LightingStriker.getInstance().setStrikeInterval(
