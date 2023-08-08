@@ -47,7 +47,7 @@ public class SpawnPool {
         spawnPool.spawnAnnouncement = jsonObject.get(ConfigKey.SPAWN_ANNOUNCEMENT).getAsString();
         spawnPool.captureAnnouncement = jsonObject.get(ConfigKey.CAPTURE_ANNOUNCEMENT).getAsString();
         spawnPool.spawnChance = jsonObject.get(ConfigKey.SPAWN_CHANCE).getAsFloat();
-        spawnPool.spawns = loadSpawnList(jsonObject.get(ConfigKey.SPAWN_LIST_FILENAME).getAsString());
+        spawnPool.spawns = loadSpawnList("config/legendaryspawns/" + jsonObject.get(ConfigKey.SPAWN_LIST_FILENAME).getAsString());
         return spawnPool;
     }
 

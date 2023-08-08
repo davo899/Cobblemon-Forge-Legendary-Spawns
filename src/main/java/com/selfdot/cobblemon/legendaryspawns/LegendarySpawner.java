@@ -39,6 +39,13 @@ public class LegendarySpawner {
     defaultConfiguration.addProperty(ConfigKey.LIGHTNING_STRIKES_PER_SPAWN, 6);
     defaultConfiguration.add(ConfigKey.SPAWN_POOLS, new JsonArray());
 
+    /*
+    defaultConfiguration.addProperty(ConfigKey.LEGENDARY_SPAWN_ANNOUNCEMENT, "&cA &eLegendary &3%legendary% &chas spawned nearby &3%player%&c!");
+    defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_SPAWN_ANNOUNCEMENT, "&cAn &dUltra Beast &3%ultrabeast% &chas spawned nearby &3%player%&c!");
+    defaultConfiguration.addProperty(ConfigKey.LEGENDARY_CAPTURE_ANNOUNCEMENT, "&cThe &eLegendary &3%legendary% &chas been captured by &3%player%&c!");
+    defaultConfiguration.addProperty(ConfigKey.ULTRA_BEAST_CAPTURE_ANNOUNCEMENT, "&cThe &dUltra Beast &3%ultrabeast% &chas been captured by &3%player%&c!");
+    */
+
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     JsonObject configuration;
     try {
