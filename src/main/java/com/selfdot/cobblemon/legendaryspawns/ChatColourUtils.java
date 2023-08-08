@@ -27,9 +27,10 @@ public class ChatColourUtils {
         .replace("&O", "" + ChatFormatting.ITALIC).replace("&R", "" + ChatFormatting.RESET);
   }
 
-  public static Component formattedAnnouncement(String announcement, Pokemon pokemon, ServerPlayer player) {
+  public static Component formattedAnnouncement(String announcement, SpawnPool spawnPool, Pokemon pokemon, ServerPlayer player) {
     return Component.literal(ChatColourUtils.format(announcement)
-        .replaceAll(ConfigKey.LEGENDARY_OR_ULTRA_BEAST_TOKEN, pokemon.getSpecies().getTranslatedName().getString())
+        .replaceAll(ConfigKey.POOL_TOKEN, spawnPool.getDisplayName())
+        .replaceAll(ConfigKey.POKEMON_TOKEN, pokemon.getSpecies().getTranslatedName().getString())
         .replaceAll(ConfigKey.PLAYER_TOKEN, player.getDisplayName().getString())
     );
   }
